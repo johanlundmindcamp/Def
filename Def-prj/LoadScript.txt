@@ -1,0 +1,194 @@
+﻿///$tab Main
+SET ThousandSep=' ';
+SET DecimalSep=',';
+SET MoneyThousandSep='.';
+SET MoneyDecimalSep=',';
+SET MoneyFormat='#.##0,00 kr;-#.##0,00 kr';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='YYYY-MM-DD';
+SET TimestampFormat='YYYY-MM-DD hh:mm:ss[.fff]';
+SET MonthNames='jan;feb;mar;apr;maj;jun;jul;aug;sep;okt;nov;dec';
+SET DayNames='må;ti;on;to;fr;lö;sö';
+
+Data:
+LOAD
+	Nr, 
+	if(isnull(Konto), 0, subfield(replace(Konto, '…', '...'), '+', iterno())) as Konto, 
+	if(isnull(Resultatenhet), 0, replace(Resultatenhet, '…', '...')) as Resultatenhet
+FROM
+[Resultaträkningsdefinition Mindcamp.xlsx]
+(ooxml, embedded labels, table is Blad1)
+WHILE iterno() <= (SubStringCount(Konto, '+')+1);
+
+Data2:
+LOAD
+	Nr,
+	subfield(Konto, '-', iterno()) as Konto,
+	if(iterno() > 1, 1) as NegKonto,
+	Resultatenhet
+RESIDENT Data
+WHILE iterno() <= (SubStringCount(Konto, '-')+1);
+
+DROP TABLE Data;
+
+Data3:
+NoConcatenate
+LOAD
+	Nr,
+	Konto,
+	NegKonto,
+	subfield(Resultatenhet, '+', iterno()) as Resultatenhet
+RESIDENT Data2
+WHILE iterno() <= (SubStringCount(Resultatenhet, '+')+1);
+
+DROP TABLE Data2;
+
+Data4:
+LOAD
+	Nr,
+	Konto,
+	NegKonto,
+	if(iterno() > 1, 1) as NegResultatenhet,
+	subfield(Resultatenhet, '-', iterno()) as Resultatenhet
+RESIDENT Data3
+WHILE iterno() <= (SubStringCount(Konto, '-')+1);
+
+DROP TABLE Data3;
+
+LEFT JOIN (Data4)
+LOAD
+	Nr,
+	Konto,
+	Resultatenhet,
+	left(Konto, 4) as minKonto,
+	right(Konto, 4) as maxKonto
+RESIDENT Data4
+WHERE substringcount(Konto, '.') > 1;
+
+LEFT JOIN (Data4)
+LOAD
+	Nr,
+	Konto,
+	Resultatenhet,
+	left(Resultatenhet, index(Resultatenhet, '..')-1) as minResultatenhet,
+	replace(right(Resultatenhet, len(Resultatenhet)-index(Resultatenhet, '..')-1), '.', '') as maxResultatenhet
+RESIDENT Data4
+WHERE substringcount(Resultatenhet, '.') > 1;
+
+Allakonton:
+LOAD
+	rowno()+999 as TempKonto
+AutoGenerate (9000);
+
+AllaResultatenheter:
+LOAD * INLINE [
+    TempEnhet
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+    10
+    11
+    12
+    100
+    101
+    102
+    103
+];
+
+LEFT JOIN (Data4)
+IntervalMatch (TempKonto)
+LOAD DISTINCT
+	minKonto,
+	maxKonto
+RESIDENT Data4;
+
+LEFT JOIN (Data4)
+IntervalMatch (TempEnhet)
+LOAD DISTINCT
+	minResultatenhet,
+	maxResultatenhet
+RESIDENT Data4;
+
+LEFT JOIN (Data4)
+LOAD
+	Nr, 
+	Rubrik, 
+	Fet, 
+	Kursiv, 
+	%, 
+	Nämnare
+FROM
+[Resultaträkningsdefinition Mindcamp.xlsx]
+(ooxml, embedded labels, table is Blad1);
+
+Def:
+NOCONCATENATE
+LOAD
+	Nr,
+	if(isnull(Rubrik), ' ', Rubrik) as Rubrik,
+	Fet,
+	Kursiv,
+	%,
+	Nämnare,
+	if(isnull(Rubrik), 0, if(isnull(TempKonto), Konto, TempKonto)) as Konto,
+	if(isnull(Rubrik), 0, if(isnull(TempEnhet), Resultatenhet, TempEnhet)) as Resultatenhet,
+	hash128(if(isnull(Rubrik), -1, if(isnull(TempKonto), Konto, TempKonto)), if(isnull(Rubrik), 0, if(isnull(TempEnhet), Resultatenhet, TempEnhet))) as Resultatnyckel
+RESIDENT Data4;
+
+DROP TABLE Data4, AllaResultatenheter, Allakonton;
+
+Länk:
+LOAD DISTINCT
+	Konto as KontoResultatNyckelKonto
+	//hash128(Konto, Resultatenhet) as KontoResultatNyckel
+RESIDENT Def
+WHERE Konto > 0;
+
+CONCATENATE (Länk)
+LOAD
+	0 as KontoResultatNyckelKonto
+AUTOGENERATE (1);
+
+JOIN (Länk)
+LOAD DISTINCT
+	Resultatenhet as KontoResultatNyckelResultatenhet
+RESIDENT Def
+WHERE Resultatenhet >= 0;
+
+LEFT JOIN (Länk)
+LOAD
+	*,
+	KontoResultatNyckelKonto as ResultatnyckelKonto,
+	KontoResultatNyckelResultatenhet as ResultatnyckelResultatenhet
+RESIDENT Länk;
+
+CONCATENATE (Länk)
+LOAD
+	KontoResultatNyckelKonto,
+	KontoResultatNyckelResultatenhet,
+	ResultatnyckelKonto,
+	-1 as ResultatnyckelResultatenhet
+RESIDENT Länk;
+
+CONCATENATE (Länk)
+LOAD
+	0 as KontoResultatNyckelKonto,
+	0 as KontoResultatNyckelResultatenhet,
+	ResultatnyckelKonto,
+	ResultatnyckelResultatenhet
+RESIDENT Länk;
+
+LEFT JOIN (Länk)
+LOAD
+	*,
+	hash128(KontoResultatNyckelKonto, KontoResultatNyckelResultatenhet) as KontoResultatNyckel,
+	hash128(ResultatnyckelKonto, ResultatnyckelResultatenhet) as Resultatnyckel
+RESIDENT Länk;
+
+//DROP FIELD KontoResultatNyckelKonto, KontoResultatNyckelResultatenhet, ResultatnyckelKonto, ResultatnyckelResultatenhet;
