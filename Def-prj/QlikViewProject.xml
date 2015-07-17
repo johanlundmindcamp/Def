@@ -1,4 +1,4 @@
-﻿<!-- Last project change: 2015-07-16 13:08:43 (2015-07-16 11:08:43) -->
+﻿<!-- Last project change: 2015-07-17 10:49:16 (2015-07-17 08:49:16) -->
 <PrjQlikViewProject>
   <GLOBAL>
     <AllPropertiesFileName>AllProperties.xml</AllPropertiesFileName>
@@ -51,8 +51,8 @@
         <PrjFrameParentDef>
           <ObjectId>Document\LB01</ObjectId>
           <Rect>
-            <Left>1550</Left>
-            <Top>209</Top>
+            <Left>1516</Left>
+            <Top>697</Top>
             <Width>450</Width>
             <Height>900</Height>
           </Rect>
@@ -85,8 +85,8 @@
         <PrjFrameParentDef>
           <ObjectId>Document\LB04</ObjectId>
           <Rect>
-            <Left>2088</Left>
-            <Top>203</Top>
+            <Left>1681</Left>
+            <Top>103</Top>
             <Width>450</Width>
             <Height>900</Height>
           </Rect>
